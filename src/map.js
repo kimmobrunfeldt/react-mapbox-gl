@@ -40,6 +40,8 @@ export default class ReactMapboxGl extends Component {
       'easeTo',
       'flyTo',
     ]),
+    containerScale: PropTypes.number,
+    movingMethodOptions: PropTypes.object,
     attributionPosition: PropTypes.oneOf([
       'top-left',
       'top-right',
@@ -62,9 +64,11 @@ export default class ReactMapboxGl extends Component {
     bearing: 0,
     scrollZoom: true,
     movingMethod: 'flyTo',
+    containerScale: 1,
     pitch: 0,
     attributionPosition: 'bottom-right',
     interactive: true,
+    showNavigationControl: true,
   };
 
   static childContextTypes = {
@@ -108,9 +112,16 @@ export default class ReactMapboxGl extends Component {
       scrollZoom,
       attributionPosition,
       interactive,
+      showNavigationControl,
+      containerScale,
     } = this.props;
 
     MapboxGl.accessToken = accessToken;
+
+    // Ugly hack very very ugly, to fix:
+    // We are using our fork of mapbox-gl-js which implements this
+    // https://github.com/Leaflet/Leaflet/issues/2795
+    MapboxGl.Dom.setContainerScale(containerScale);
 
     const map = new MapboxGl.Map({
       preserveDrawingBuffer,
@@ -222,6 +233,10 @@ export default class ReactMapboxGl extends Component {
         onZoomEnd(map, ...args);
       }
     });
+
+    if (showNavigationControl) {
+      map.addControl(new MapboxGl.NavigationControl());
+    }
   }
 
   componentWillUnmount() {
@@ -272,11 +287,20 @@ export default class ReactMapboxGl extends Component {
     );
 
     if (didZoomUpdate || didCenterUpdate || didBearingUpdate) {
+      const movingMethodOptions = this.props.movingMethodOptions || {};
       map[this.props.movingMethod]({
+        ...movingMethodOptions,
         zoom: didZoomUpdate ? nextProps.zoom[0] : zoom,
         center: didCenterUpdate ? nextProps.center : center,
         bearing: didBearingUpdate ? nextProps.bearing : bearing,
       });
+    }
+
+    if (this.props.containerScale !== nextProps.containerScale) {
+      // Ugly hack very very ugly, to fix:
+      // We are using our fork of mapbox-gl-js which implements this
+      // https://github.com/Leaflet/Leaflet/issues/2795
+      MapboxGl.Dom.setContainerScale(nextProps.containerScale);
     }
 
     if (!isEqual(this.props.style, nextProps.style)) {
